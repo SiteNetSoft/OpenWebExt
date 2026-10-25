@@ -2,3 +2,4 @@ quarkus-safe-fetch/
 quarkus-webfinger/
 quarkus-http-signatures/
 .superpowers/
+quarkus-activitypub/
