@@ -84,3 +84,19 @@ milestone finished on 2026-10-27.
 - Task 15: minor (deferred, final wave candidate): AtprotoLexiconReflection FQN is the first generated type's package — two codegen modules sharing that package collide (name it per generation root); stale holder possible without a clean build.
 - Ruling: final fix wave folds in A-M1, A-M2, A-M3, A-M4, A-M6, A-M8 (skill/IT docs), B-M1, B-M2, B-M4, plus deferred Task 13 handle-downgrade and Task 15 reflection-holder naming; defers A-M5 (double metadata fetch), A-M7 (safe-fetch origin compare — Milestone 2 repo), B-M3 (`uri` format strictness vs java.net.URI — interop read failure on others' records), B-M5 (signing key unparsed; legacy blobs) — cost if wrong: those four remain as documented follow-ups.
 - Final fix wave re-review: all 14 addressed, no new Critical/Important. Residual minors parked: refresh lease can lapse during a slow (>30s) pre-check+spend and release has no owner token; transient classification treats every SafeFetchException/IOException (incl. parse errors after a spend) as temporary; reflection holder name shared by main and test codegen of one module; F8 cosmetic races + stale RefreshTest javadoc; AtprotoSyntaxModule on the global ObjectMapper makes app JSON Handle binding syntax-only (document); bounce page repeats code/state in access logs (pre-existing exposure).
+
+## After publishing (2026-10-27)
+
+The three repos were created on github.com/SiteNetSoft and pushed in dependency order. JVM CI passed first time. The
+`quarkus-atproto` native job needed four fixes before it went green, native ITs included:
+
+- `f332df9` (quarkus-atproto): `DpopProofs`, `LoginHandler` and `SessionCookie` hold a static `SecureRandom` → runtime
+  class initialisation; `TidClock`'s random clock id too.
+- `d501cba`, `077f500`, `c3dad19` (multikey-java): BouncyCastle is optional, and a native image without it could not link
+  `Secp256k1`. Callers now go through the `Secp256k1Ops` interface, and `Bc` loads the implementation by a name read at
+  runtime. **Native images therefore have no secp256k1 key objects or ES256K signatures yet** (README); the earlier
+  `quarkus-did` substitution attempt was reverted (`6ef25b7`).
+- `3921147` (quarkus-atproto): the six OAuth route handler classes are registered for reflection (`BeanHandler` loads
+  them by name).
+
+Heads: multikey-java `c3dad19`, quarkus-did `6ef25b7`, quarkus-atproto `3921147`.
