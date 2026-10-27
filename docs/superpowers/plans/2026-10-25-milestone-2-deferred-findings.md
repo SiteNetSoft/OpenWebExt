@@ -66,3 +66,15 @@ Extracted from the execution ledger on 2026-10-25 after the final review. Every 
 - Task 13: minor (deferred): retryNow loads whole state tables; retry message ignores host pause; mixed types in summary(); paused hosts derived from the 200 newest pending only; double-knocking wording at activitypub.adoc:63; interop restart warning (in-memory H2 + drop-and-create regenerates keys); open unauthenticated demo endpoint with unescaped content; DemoFlowIT needs port 8081; reactor-ordering hack kept untested either way.
 - Note: the fixer's first Maven run overlapped another session's QuarkPress build (host rule breach, no crash); later runs waited.
 - Final re-review minors (deferred): pre-verification parse of every signed body on the event loop up to max-body-size and uncaught RuntimeException → 500 (peek with readTree instead); ActorKeyResolver inFlight registered at resolve() not subscribe; refetch throttle keyed on full key id (fragment variation bypass → key on document URI); @ObservesAsync tasks unbounded and shutdown doesn't await; safe-fetch sameHost ignores scheme/port; client DomainPolicy not applied after redirects nor to WebFinger lookups; virtual-thread pinning with blocking JDBC inside synchronized code on JDK 21.
+
+## Pre-interop batch (2026-10-26)
+
+Fixed and pushed in quarkus-activitypub `bd0e5ea..cdaa44c`: invalid URI strings in object-or-link values are repaired or dropped; the sample's `POST /demo/post` needs a bearer token (disabled in prod without one) and escapes its text; key refetch throttle keyed on the actor document; inbox bodies screened with a JSON-tree peek and parsed once after verification; host-health row inserted before the row lock (MySQL gap-lock deadlock). Reviewer verdict: ready to push, no Critical/Important.
+
+Minor follow-ups from that review:
+- `LenientUris`: `[` and `]` are in the allowed set but `java.net.URI` rejects them outside an IPv6 host, so `?a[]=1` with a space is dropped instead of repaired; dead surrogate branch in the encoder.
+- Repair can turn a space-only-invalid `javascript:` string into an opaque Ref; renderers must keep filtering URL schemes.
+- Key refetch throttle keys on the document URI including its query, so `?x=N` variants still fetch once each (inherent: key ids are attacker-chosen).
+- `HibernateDeliveryStore` host-health insert: under REPEATABLE READ/SERIALIZABLE with an established snapshot the nested insert is invisible to the locked find; document that READ COMMITTED is required.
+- Inbox body parsed into a JSON tree twice (peek + parse); pass the tree along.
+- Send `ASLink.href` through `LenientUris` too (Pleroma/Akkoma attachment Link hrefs with unencoded filenames), dropping just that Link when unrepairable.
