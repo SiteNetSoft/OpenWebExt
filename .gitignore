@@ -3,3 +3,6 @@ quarkus-webfinger/
 quarkus-http-signatures/
 .superpowers/
 quarkus-activitypub/
+multikey-java/
+quarkus-did/
+quarkus-atproto/
