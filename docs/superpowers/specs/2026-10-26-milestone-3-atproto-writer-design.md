@@ -256,7 +256,8 @@ generated against the pack's classes) without duplicates. `quarkus-atproto-xrpc`
 
 ### Flow
 
-1. `GET {login-path}?handle=<handle-or-did>` (or a form POST): resolve via Module 4 → PDS → GET
+1. `POST {login-path}` with form field `handle=<handle-or-did>` (amended 2026-10-27, see "Amendments" below: same-origin
+   POST only, GET → 405): resolve via Module 4 → PDS → GET
    `/.well-known/oauth-protected-resource` (exactly one `authorization_servers` entry) → GET
    `/.well-known/oauth-authorization-server`; check `issuer` equals the fetched origin and the required flags
    (`require_pushed_authorization_requests`, `authorization_response_iss_parameter_supported`,
@@ -305,8 +306,9 @@ test form login).
 - DPoP on PDS calls: `Authorization: DPoP <token>`, proof with `htm`, `htu`, `iat`, `jti`, `ath`, the **PDS's own**
   nonce; `use_dpop_nonce` → store and retry once; expired token → refresh, then retry once.
 - **Refresh:** refresh tokens are single-use, so refreshes are serialised per session (in-process lock) and the store
-  SPI updates with compare-and-set on the old refresh token so two nodes cannot both spend it; the loser re-reads the
-  stored session.
+  SPI updates with compare-and-set on the old refresh token, which decides which node's tokens are stored; the loser
+  re-reads the stored session. Compare-and-set alone runs after the spend, so to stop two nodes from both spending
+  one token a shared store implements the optional refresh lease (amended 2026-10-27, see "Amendments").
 - `POST {logout-path}`: revoke at the AS `revocation_endpoint` when advertised (best effort), delete the session,
   clear the cookie.
 
@@ -405,3 +407,17 @@ tokens), a "sign in" link.
 - The exact Jackson strategy for generated unions and `$type`, as long as the wire rules above hold.
 - Caffeine sizes, log wording, Dev UI component details.
 - How the fakes are structured internally, as long as their knobs cover the listed cases.
+
+## Amendments (2026-10-27, made during implementation)
+
+- **Sign-in starts only with a same-origin POST.** `POST {login-path}` requires `Sec-Fetch-Site: same-origin` or an
+  `Origin` equal to the app's origin; `GET` answers 405. A GET (or cross-site POST) would let another site start a
+  sign-in in the victim's browser and, with an attacker-run authorization server that skips consent, attach the
+  attacker's account to the victim (login CSRF). A browser-binding cookie set at login is required at the callback.
+- **Link mode binds the app principal.** The pending entry records the app principal at login and the callback
+  requires the same principal. When the callback arrives without the app's own cookie (a `SameSite=Strict` cookie is
+  withheld on the cross-site return from the authorization server), the callback first answers a same-origin bounce
+  to itself, so the cookie is sent.
+- **Refresh across nodes.** The session store SPI gains an optional refresh lease (default: single-node). Without
+  it, two nodes can still spend the same refresh token and the authorization server may revoke the grant.
+- **Record keys are validated** against the Lexicon's `key` type before `create(rkey)`/`put`.
